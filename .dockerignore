@@ -1,0 +1,16 @@
+node_modules
+.next
+.git
+.gitignore
+data/
+data-test/
+tests/
+coverage
+.vscode
+.env*
+*.log
+*.tsbuildinfo
+Dockerfile
+.dockerignore
+*.md
+!README.md

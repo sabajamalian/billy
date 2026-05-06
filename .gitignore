@@ -42,4 +42,12 @@ next-env.d.ts
 
 /node_modules/.prisma/client
 .env
-data/
+
+# playwright
+playwright-report/
+test-results/
+data/billy.test.db*
+# Billy runtime data
+/data/billy.db*
+/data/uploads/*
+!/data/uploads/.gitkeep

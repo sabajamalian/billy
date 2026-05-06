@@ -5,9 +5,11 @@ import {
   BudgetExceededError,
   ImageError,
   OcrError,
+  NoModelsConfiguredError,
   RateLimitError,
   RetryLimitError,
   runScan,
+  scanFailedEventForError,
   type ScanEvent,
 } from "@/server/scan/orchestrator";
 
@@ -51,22 +53,26 @@ export async function POST(request: Request, ctx: RouteContext) {
 
 function streamRescan(request: Request, billId: string): Response {
   const encoder = new TextEncoder();
-  const send = (controller: ReadableStreamDefaultController<Uint8Array>, event: ScanEvent | { type: "error"; status: number; message: string }) => {
+  const send = (controller: ReadableStreamDefaultController<Uint8Array>, event: ScanEvent) => {
     controller.enqueue(encoder.encode(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`));
   };
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
+      let failedSent = false;
       void (async () => {
         try {
           await runScan({
             imageBuffer: await parseImage(request),
             ip: clientIp(request),
             billId,
-            onEvent: (event) => send(controller, event),
+            onEvent: (event) => {
+              if (event.type === "scan.failed") failedSent = true;
+              send(controller, event);
+            },
           });
         } catch (err) {
-          send(controller, { type: "error", status: statusForError(err), message: messageForError(err) });
+          if (!failedSent) send(controller, scanFailedEventForError(err));
         } finally {
           controller.close();
         }
@@ -87,6 +93,7 @@ function statusForError(err: unknown): number {
   if (err instanceof RateLimitError || err instanceof BudgetExceededError || err instanceof RetryLimitError) return 429;
   if (err instanceof ImageError) return 400;
   if (err instanceof OcrError) return 502;
+  if (err instanceof NoModelsConfiguredError) return 503;
   if (err instanceof Error && (err.name === "BillNotFoundError" || err.message === "Bill not found")) return 404;
   if (err instanceof Error && err.name === "BillExpiredError") return 410;
   return 500;

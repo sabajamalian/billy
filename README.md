@@ -34,3 +34,20 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Self-hosting with Docker
+
+Billy is designed for self-hosting as a single Docker image. From the repository root, create or update `.env`, then run:
+
+```bash
+docker compose up -d --build
+```
+
+The compose file loads `.env` with `DATABASE_URL`, `ADMIN_PASSWORD`, Billy settings such as `BILLY_OCR_MODELS`, `BILLY_BILL_TTL_DAYS`, `BILLY_DAILY_LLM_COST_USD`, `BILLY_PER_BILL_RETRY_LIMIT`, and `BILLY_PER_IP_SCAN_LIMIT`, plus provider keys such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, and `GOOGLE_API_KEY` when those OCR models are enabled. The container defaults to `DATABASE_URL=file:/app/data/billy.db`; the compose bind mount stores that database under `./data` on the host.
+
+Set a strong `ADMIN_PASSWORD` in `.env`, start the service, then visit `http://localhost:3000/admin` to access admin features. Keep `.env` private and never commit provider keys or the admin password.
+
+To back up Billy, stop writes if possible and copy `data/billy.db*` from the host; SQLite WAL mode may create `billy.db-wal` and `billy.db-shm` alongside the main database. Uploaded receipt files live under `data/uploads/`.
+
+Billy does not provide built-in TLS or whole-site authentication beyond the admin gate. Put it behind a reverse proxy for HTTPS, host-level access controls, and any additional authentication you require.
+

@@ -19,8 +19,15 @@ export type ProviderProgressEvent = {
   error?: string;
 };
 export type VotingDoneEvent = { type: "voting.done"; itemsCount: number; subtotalMismatch: boolean };
+export type ScanErrorType =
+  | "rate_limited"
+  | "budget_exhausted"
+  | "retry_exhausted"
+  | "image_error"
+  | "no_models"
+  | "internal";
 export type ScanCompleteEvent = { type: "scan.complete"; billShareToken: string; billId: string };
-export type ScanFailedEvent = { type: "scan.failed"; reason: string };
+export type ScanFailedEvent = { type: "scan.failed"; reason: string; errorType: ScanErrorType; retryAfterSeconds?: number };
 
 export type ScanEvent = ScanStartedEvent | ProviderProgressEvent | VotingDoneEvent | ScanCompleteEvent | ScanFailedEvent;
 
@@ -88,7 +95,34 @@ export class OcrError extends Error {
   }
 }
 
+export class NoModelsConfiguredError extends Error {
+  code = "no_models" as const;
+
+  constructor() {
+    super("No OCR models are configured");
+    this.name = "NoModelsConfiguredError";
+  }
+}
+
 const reasonFor = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+
+export function errorTypeForError(err: unknown): ScanErrorType {
+  if (err instanceof RateLimitError) return "rate_limited";
+  if (err instanceof BudgetExceededError) return "budget_exhausted";
+  if (err instanceof RetryLimitError) return "retry_exhausted";
+  if (err instanceof ImageError) return "image_error";
+  if (err instanceof NoModelsConfiguredError) return "no_models";
+  return "internal";
+}
+
+export function scanFailedEventForError(err: unknown): ScanFailedEvent {
+  return {
+    type: "scan.failed",
+    reason: reasonFor(err),
+    errorType: errorTypeForError(err),
+    retryAfterSeconds: err instanceof RateLimitError || err instanceof RetryLimitError ? err.retryAfterSeconds : undefined,
+  };
+}
 
 const fetchBillById = async (billId: string): Promise<BillWithItems> => {
   const bill = await prisma.bill.findUnique({
@@ -119,12 +153,14 @@ export async function runScan(args: RunScanArgs): Promise<RunScanResult> {
       if (!retryLimit.allowed) throw new RetryLimitError(retryLimit.retryAfterSeconds);
     }
 
+    const models = await getActiveModels();
+    if (models.length === 0) throw new NoModelsConfiguredError();
+
     const created = args.billId ? undefined : await createBill();
     if (created?.hostToken && process.env.NODE_ENV !== "test") {
       await setHostTokenCookie(created.bill.id, created.hostToken, created.bill.expiresAt);
     }
     let bill = args.billId ? await fetchBillById(args.billId) : created!.bill;
-    const models = await getActiveModels();
 
     emit({ type: "scan.started", modelCount: models.length });
     const ocrResult = await runOcr({ billId: bill.id, image, models });
@@ -179,7 +215,7 @@ export async function runScan(args: RunScanArgs): Promise<RunScanResult> {
       votingMismatch: voted.subtotalMismatch,
     };
   } catch (err) {
-    emit({ type: "scan.failed", reason: reasonFor(err) });
+    emit(scanFailedEventForError(err));
     throw err;
   }
 }

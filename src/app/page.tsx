@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { InstallPrompt } from "@/components/InstallPrompt";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Receipt, Camera, PenLine } from "lucide-react";
@@ -57,6 +58,7 @@ export default function Home() {
       <footer className="w-full max-w-md py-4 text-center text-xs text-zinc-400 dark:text-zinc-600">
         Built with care · self-hostable
       </footer>
+      <InstallPrompt />
     </main>
   );
 }

@@ -225,7 +225,7 @@ describe("runScan", () => {
     const { OcrError, runScan } = await import("@/server/scan/orchestrator");
 
     await expect(runScan({ imageBuffer: Buffer.from("receipt"), ip: "1.2.3.4", onEvent: (event) => events.push(event) })).rejects.toBeInstanceOf(OcrError);
-    expect(events).toContainEqual({ type: "scan.failed", reason: "All OCR providers failed" });
+    expect(events).toContainEqual(expect.objectContaining({ type: "scan.failed", reason: "All OCR providers failed" }));
   });
 
   it("returns votingMismatch=true without blocking", async () => {

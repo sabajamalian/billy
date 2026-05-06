@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -19,6 +20,10 @@ export const metadata: Metadata = {
   applicationName: "Billy",
   authors: [{ name: "Billy" }],
   formatDetection: { telephone: false },
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/icons/apple-touch-icon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -47,6 +52,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         {children}
         <Toaster position="top-center" richColors />
+        <ServiceWorkerRegister />
       </body>
     </html>
   );
