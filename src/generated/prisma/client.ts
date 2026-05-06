@@ -56,3 +56,8 @@ export type Item = Prisma.ItemModel
  * 
  */
 export type OcrRun = Prisma.OcrRunModel
+/**
+ * Model AdminSetting
+ * 
+ */
+export type AdminSetting = Prisma.AdminSettingModel

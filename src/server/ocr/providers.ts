@@ -46,7 +46,7 @@ Conventions:
 - Item names: keep concise (≤ 100 chars), preserve original ordering.
 - Currency: ISO 4217 code (e.g. "USD", "EUR", "GBP"). Default "USD" if unclear.`;
 
-const PRICING_PER_MTOKEN_USD: Record<string, { input: number; output: number }> = {
+export const PRICING_PER_MTOKEN_USD: Record<string, { input: number; output: number }> = {
   "openai:gpt-4o": { input: 2.5, output: 10 },
   "openai:gpt-4o-mini": { input: 0.15, output: 0.6 },
   "anthropic:claude-3-5-sonnet-20241022": { input: 3, output: 15 },

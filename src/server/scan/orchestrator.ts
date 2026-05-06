@@ -1,10 +1,11 @@
 import { setHostTokenCookie } from "@/lib/cookies";
 import { prisma } from "@/lib/prisma";
+import { getActiveModels, getQuorumOverride } from "@/server/admin/settings";
 import { createBill, replaceItems, updateBillSummary, type BillWithItems } from "@/server/billing/bill-service";
 import { llmBudget } from "@/server/limits/budget";
 import { billRetryLimit, ipScanLimit } from "@/server/limits/rate-limit";
 import { ImageValidationError, preprocessImage } from "@/server/ocr/preprocess";
-import { getConfiguredModels, runOcr } from "@/server/ocr/providers";
+import { runOcr } from "@/server/ocr/providers";
 import { voteOcr } from "@/server/ocr/voting";
 
 export type ScanStartedEvent = { type: "scan.started"; modelCount: number };
@@ -123,7 +124,7 @@ export async function runScan(args: RunScanArgs): Promise<RunScanResult> {
       await setHostTokenCookie(created.bill.id, created.hostToken, created.bill.expiresAt);
     }
     let bill = args.billId ? await fetchBillById(args.billId) : created!.bill;
-    const models = getConfiguredModels();
+    const models = await getActiveModels();
 
     emit({ type: "scan.started", modelCount: models.length });
     const ocrResult = await runOcr({ billId: bill.id, image, models });
@@ -153,7 +154,8 @@ export async function runScan(args: RunScanArgs): Promise<RunScanResult> {
 
     if (ocrResult.runs.every((run) => !run.ok)) throw new OcrError();
 
-    const voted = voteOcr(ocrResult.runs);
+    const quorumOverride = await getQuorumOverride();
+    const voted = voteOcr(ocrResult.runs, quorumOverride ? { quorum: () => quorumOverride } : undefined);
     emit({ type: "voting.done", itemsCount: voted.items.length, subtotalMismatch: voted.subtotalMismatch });
 
     bill = await replaceItems(bill, voted.items);

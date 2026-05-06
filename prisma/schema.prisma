@@ -75,3 +75,10 @@ model OcrRun {
   @@index([billId])
   @@index([imageHash])
 }
+
+model AdminSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}

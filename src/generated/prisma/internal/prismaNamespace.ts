@@ -386,7 +386,8 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 export const ModelName = {
   Bill: 'Bill',
   Item: 'Item',
-  OcrRun: 'OcrRun'
+  OcrRun: 'OcrRun',
+  AdminSetting: 'AdminSetting'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -402,7 +403,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "bill" | "item" | "ocrRun"
+    modelProps: "bill" | "item" | "ocrRun" | "adminSetting"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -628,6 +629,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    AdminSetting: {
+      payload: Prisma.$AdminSettingPayload<ExtArgs>
+      fields: Prisma.AdminSettingFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.AdminSettingFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminSettingPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.AdminSettingFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminSettingPayload>
+        }
+        findFirst: {
+          args: Prisma.AdminSettingFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminSettingPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.AdminSettingFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminSettingPayload>
+        }
+        findMany: {
+          args: Prisma.AdminSettingFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminSettingPayload>[]
+        }
+        create: {
+          args: Prisma.AdminSettingCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminSettingPayload>
+        }
+        createMany: {
+          args: Prisma.AdminSettingCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.AdminSettingCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminSettingPayload>[]
+        }
+        delete: {
+          args: Prisma.AdminSettingDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminSettingPayload>
+        }
+        update: {
+          args: Prisma.AdminSettingUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminSettingPayload>
+        }
+        deleteMany: {
+          args: Prisma.AdminSettingDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.AdminSettingUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.AdminSettingUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminSettingPayload>[]
+        }
+        upsert: {
+          args: Prisma.AdminSettingUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AdminSettingPayload>
+        }
+        aggregate: {
+          args: Prisma.AdminSettingAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateAdminSetting>
+        }
+        groupBy: {
+          args: Prisma.AdminSettingGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AdminSettingGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.AdminSettingCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AdminSettingCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -716,6 +791,16 @@ export const OcrRunScalarFieldEnum = {
 } as const
 
 export type OcrRunScalarFieldEnum = (typeof OcrRunScalarFieldEnum)[keyof typeof OcrRunScalarFieldEnum]
+
+
+export const AdminSettingScalarFieldEnum = {
+  key: 'key',
+  value: 'value',
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type AdminSettingScalarFieldEnum = (typeof AdminSettingScalarFieldEnum)[keyof typeof AdminSettingScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -894,6 +979,7 @@ export type GlobalOmitConfig = {
   bill?: Prisma.BillOmit
   item?: Prisma.ItemOmit
   ocrRun?: Prisma.OcrRunOmit
+  adminSetting?: Prisma.AdminSettingOmit
 }
 
 /* Types for Logging */

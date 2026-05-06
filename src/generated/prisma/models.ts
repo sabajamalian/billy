@@ -11,4 +11,5 @@
 export type * from './models/Bill'
 export type * from './models/Item'
 export type * from './models/OcrRun'
+export type * from './models/AdminSetting'
 export type * from './commonInputTypes'

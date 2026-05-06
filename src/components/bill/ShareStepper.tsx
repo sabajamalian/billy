@@ -95,8 +95,20 @@ export function ShareStepper({
           "min-h-11 min-w-16 border-x border-border px-3 text-center text-lg font-semibold tabular-nums outline-none transition-colors",
           "focus-visible:ring-3 focus-visible:ring-ring/50",
         )}
-        aria-label={`${ariaLabel}: ${formatShareDisplay(shares)} selected. Long press for fractional shares.`}
-        onClick={(event) => event.stopPropagation()}
+        aria-label={`${ariaLabel}: ${formatShareDisplay(shares)} selected. Tap or long-press to choose a fractional share.`}
+        aria-haspopup="dialog"
+        onClick={(event) => {
+          event.stopPropagation();
+          clearLongPress();
+          onOpenFractionalMenu?.();
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.stopPropagation();
+            event.preventDefault();
+            onOpenFractionalMenu?.();
+          }
+        }}
         onPointerDown={(event) => {
           event.stopPropagation();
           startLongPress();

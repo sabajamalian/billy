@@ -53,7 +53,8 @@ export const AnyNull = runtime.AnyNull
 export const ModelName = {
   Bill: 'Bill',
   Item: 'Item',
-  OcrRun: 'OcrRun'
+  OcrRun: 'OcrRun',
+  AdminSetting: 'AdminSetting'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -121,6 +122,16 @@ export const OcrRunScalarFieldEnum = {
 } as const
 
 export type OcrRunScalarFieldEnum = (typeof OcrRunScalarFieldEnum)[keyof typeof OcrRunScalarFieldEnum]
+
+
+export const AdminSettingScalarFieldEnum = {
+  key: 'key',
+  value: 'value',
+  updatedAt: 'updatedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type AdminSettingScalarFieldEnum = (typeof AdminSettingScalarFieldEnum)[keyof typeof AdminSettingScalarFieldEnum]
 
 
 export const SortOrder = {

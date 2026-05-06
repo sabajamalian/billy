@@ -3,11 +3,10 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeftIcon, Share2Icon, SaveIcon } from "lucide-react";
+import { ArrowLeftIcon, Loader2Icon, Share2Icon, SaveIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Toaster } from "@/components/ui/sonner";
 import { ItemEditor, type ItemDraft } from "@/components/bill-edit/ItemEditor";
 import { ReconciliationBanner } from "@/components/bill-edit/ReconciliationBanner";
 import { TaxField } from "@/components/bill-edit/TaxField";
@@ -121,7 +120,6 @@ export function HostEditView({ initialBill }: Props) {
 
   return (
     <div className="min-h-dvh bg-muted/30 pb-44">
-      <Toaster richColors position="top-center" />
       <header className="sticky top-0 z-20 border-b bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="mx-auto flex max-w-2xl items-center gap-3">
           <Button type="button" variant="ghost" size="icon-lg" className="h-11 w-11" onClick={() => router.back()} aria-label="Cancel and go back">
@@ -168,11 +166,11 @@ export function HostEditView({ initialBill }: Props) {
           <Separator />
           <div className="grid grid-cols-2 gap-2">
             <Button type="button" variant="outline" className="h-12 rounded-xl" onClick={handleSave} disabled={isSaving}>
-              <SaveIcon aria-hidden="true" />
+              {isSaving ? <Loader2Icon className="animate-spin" aria-hidden="true" /> : <SaveIcon aria-hidden="true" />}
               Save
             </Button>
             <Button type="button" className="h-12 rounded-xl" onClick={handleShare} disabled={isSaving || !hasItems}>
-              <Share2Icon aria-hidden="true" />
+              {isSaving ? <Loader2Icon className="animate-spin" aria-hidden="true" /> : <Share2Icon aria-hidden="true" />}
               Share with friends
             </Button>
           </div>

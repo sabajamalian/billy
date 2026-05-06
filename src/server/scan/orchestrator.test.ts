@@ -8,7 +8,8 @@ import type { VotedBill } from "@/server/ocr/voting";
 const mocks = vi.hoisted(() => ({
   preprocessImageMock: vi.fn(),
   runOcrMock: vi.fn(),
-  getConfiguredModelsMock: vi.fn(),
+  getActiveModelsMock: vi.fn(),
+  getQuorumOverrideMock: vi.fn(),
   voteOcrMock: vi.fn(),
   createBillMock: vi.fn(),
   replaceItemsMock: vi.fn(),
@@ -25,7 +26,8 @@ const mocks = vi.hoisted(() => ({
 const {
   preprocessImageMock,
   runOcrMock,
-  getConfiguredModelsMock,
+  getActiveModelsMock,
+  getQuorumOverrideMock,
   voteOcrMock,
   createBillMock,
   replaceItemsMock,
@@ -45,8 +47,12 @@ vi.mock("@/server/ocr/preprocess", async (importOriginal) => {
 });
 
 vi.mock("@/server/ocr/providers", () => ({
-  getConfiguredModels: mocks.getConfiguredModelsMock,
   runOcr: mocks.runOcrMock,
+}));
+
+vi.mock("@/server/admin/settings", () => ({
+  getActiveModels: mocks.getActiveModelsMock,
+  getQuorumOverride: mocks.getQuorumOverrideMock,
 }));
 
 vi.mock("@/server/ocr/voting", () => ({ voteOcr: mocks.voteOcrMock }));
@@ -143,10 +149,11 @@ const setupHappyMocks = () => {
   retryCheckMock.mockReturnValue({ allowed: true });
   budgetCheckMock.mockReturnValue({ allowed: true, spentToday: 0, capUsd: 1 });
   preprocessImageMock.mockResolvedValue(image);
-  getConfiguredModelsMock.mockReturnValue([
+  getActiveModelsMock.mockResolvedValue([
     { provider: "openai", model: "gpt-4o" },
     { provider: "google", model: "gemini-1.5-flash" },
   ]);
+  getQuorumOverrideMock.mockResolvedValue(null);
   runOcrMock.mockResolvedValue({
     runs: [successfulRun("openai", "gpt-4o"), successfulRun("google", "gemini-1.5-flash", 0.02)],
     totalLatencyMs: 20,
