@@ -1,0 +1,77 @@
+// Billy — bill-splitting web app
+// Schema is intentionally minimal: only the bill itself lives on the server.
+// Per-user selections live in browser localStorage.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum BillStatus {
+  SCANNING
+  READY
+}
+
+model Bill {
+  id               String     @id @default(cuid())
+  shareToken       String     @unique
+  hostTokenHash    String
+  status           BillStatus @default(SCANNING)
+  imagePath        String?
+  currency         String     @default("USD")
+  taxCents         Int        @default(0)
+  tipInputType     String     @default("FLAT")
+  tipInputValue    Float      @default(0)
+  tipResolvedCents Int        @default(0)
+  acceptedMismatch Boolean    @default(false)
+  version          Int        @default(0)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  expiresAt        DateTime
+
+  items   Item[]
+  ocrRuns OcrRun[]
+
+  @@index([shareToken])
+  @@index([expiresAt])
+}
+
+model Item {
+  id             String  @id @default(cuid())
+  billId         String
+  name           String
+  unitPriceCents Int
+  quantity       Int     @default(1)
+  position       Int     @default(0)
+  confidence     Float   @default(1.0)
+  flagged        Boolean @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  bill Bill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@index([billId])
+}
+
+model OcrRun {
+  id        String   @id @default(cuid())
+  billId    String
+  provider  String
+  model     String
+  rawJson   String
+  ok        Boolean
+  latencyMs Int
+  costUsd   Float?
+  error     String?
+  imageHash String
+  createdAt DateTime @default(now())
+
+  bill Bill @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  @@index([billId])
+  @@index([imageHash])
+}
