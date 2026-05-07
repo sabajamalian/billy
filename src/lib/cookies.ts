@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import type { NextResponse } from "next/server";
 
 const HOST_TOKEN_PREFIX = "billy_host_";
 
@@ -33,4 +34,23 @@ export const setHostTokenCookie = async (
 export const clearHostTokenCookie = async (billId: string): Promise<void> => {
   const store = await cookies();
   store.delete(hostTokenCookieName(billId));
+};
+
+/**
+ * Set the host token cookie directly on a NextResponse. Use this when the
+ * response wraps a streaming body — calling cookies().set() inside the stream's
+ * start callback is too late, because Next.js commits response headers when the
+ * stream begins emitting. This helper writes the Set-Cookie header
+ * synchronously on the outgoing response so the browser receives it.
+ */
+export const setHostTokenOnResponse = (
+  response: NextResponse,
+  billId: string,
+  token: string,
+  expiresAt: Date,
+): void => {
+  response.cookies.set(hostTokenCookieName(billId), token, {
+    ...baseCookieOptions,
+    expires: expiresAt,
+  });
 };

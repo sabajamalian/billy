@@ -4,8 +4,8 @@ import { getActiveModels, getQuorumOverride } from "@/server/admin/settings";
 import { createBill, replaceItems, updateBillSummary, type BillWithItems } from "@/server/billing/bill-service";
 import { llmBudget } from "@/server/limits/budget";
 import { billRetryLimit, ipScanLimit } from "@/server/limits/rate-limit";
-import { ImageValidationError, preprocessImage } from "@/server/ocr/preprocess";
-import { runOcr } from "@/server/ocr/providers";
+import { ImageValidationError, preprocessImage, type PreprocessedImage } from "@/server/ocr/preprocess";
+import { runOcr, type ConfiguredModel } from "@/server/ocr/providers";
 import { voteOcr } from "@/server/ocr/voting";
 
 export type ScanStartedEvent = { type: "scan.started"; modelCount: number };
@@ -44,6 +44,22 @@ export type RunScanResult = {
   billId: string;
   billExpiresAt: Date;
   votingMismatch: boolean;
+};
+
+export type ActiveModelEntry = ConfiguredModel;
+
+/**
+ * State produced by `prepareScan` (preflight + bill creation) and consumed by
+ * `executeScan` (OCR + voting + save). Splitting the pipeline lets the route
+ * handler create the bill synchronously and set the host cookie on the
+ * outgoing streaming response BEFORE the stream begins emitting.
+ */
+export type PreparedScan = {
+  bill: BillWithItems;
+  hostToken?: string;
+  image: PreprocessedImage;
+  models: ActiveModelEntry[];
+  isNewBill: boolean;
 };
 
 export class RateLimitError extends Error {
@@ -133,37 +149,77 @@ const fetchBillById = async (billId: string): Promise<BillWithItems> => {
   return bill;
 };
 
-export async function runScan(args: RunScanArgs): Promise<RunScanResult> {
+export type PrepareScanArgs = {
+  imageBuffer: Buffer;
+  ip: string;
+  billId?: string;
+};
+
+/**
+ * Preflight + bill creation. Runs all the validation that can fail before any
+ * OCR provider is invoked, and creates the bill (assigning a host token) when
+ * needed. For new bills, it also calls setHostTokenCookie so subsequent
+ * server-internal `assertHost` checks succeed in the same request scope.
+ */
+export async function prepareScan(args: PrepareScanArgs): Promise<PreparedScan> {
+  const ipLimit = ipScanLimit.check(args.ip);
+  if (!ipLimit.allowed) throw new RateLimitError(ipLimit.retryAfterSeconds);
+
+  const budget = llmBudget.check();
+  if (!budget.allowed) throw new BudgetExceededError();
+
+  const image = await preprocessImage(args.imageBuffer).catch((err: unknown) => {
+    if (err instanceof ImageValidationError) throw new ImageError(err.message);
+    throw err;
+  });
+
+  if (args.billId) {
+    const retryLimit = billRetryLimit.check(args.billId);
+    if (!retryLimit.allowed) throw new RetryLimitError(retryLimit.retryAfterSeconds);
+  }
+
+  const models = await getActiveModels();
+  if (models.length === 0) throw new NoModelsConfiguredError();
+
+  if (args.billId) {
+    const bill = await fetchBillById(args.billId);
+    return { bill, image, models, isNewBill: false };
+  }
+
+  const created = await createBill();
+  if (process.env.NODE_ENV !== "test") {
+    // Mutates the request-side cookie store so server-internal assertHost()
+    // calls during executeScan succeed. The browser-facing Set-Cookie is set
+    // by the route handler on the outgoing response (see setHostTokenOnResponse).
+    await setHostTokenCookie(created.bill.id, created.hostToken, created.bill.expiresAt);
+  }
+  return {
+    bill: created.bill,
+    hostToken: created.hostToken,
+    image,
+    models,
+    isNewBill: true,
+  };
+}
+
+export type ExecuteScanArgs = {
+  prepared: PreparedScan;
+  ip: string;
+  onEvent?: (e: ScanEvent) => void;
+};
+
+/**
+ * OCR + voting + save. Emits scan lifecycle events. Assumes the bill already
+ * exists and that any cookie-based auth state needed by replaceItems /
+ * updateBillSummary has been established by `prepareScan`.
+ */
+export async function executeScan(args: ExecuteScanArgs): Promise<RunScanResult> {
   const emit = args.onEvent ?? (() => undefined);
+  const { prepared } = args;
 
   try {
-    const ipLimit = ipScanLimit.check(args.ip);
-    if (!ipLimit.allowed) throw new RateLimitError(ipLimit.retryAfterSeconds);
-
-    const budget = llmBudget.check();
-    if (!budget.allowed) throw new BudgetExceededError();
-
-    const image = await preprocessImage(args.imageBuffer).catch((err: unknown) => {
-      if (err instanceof ImageValidationError) throw new ImageError(err.message);
-      throw err;
-    });
-
-    if (args.billId) {
-      const retryLimit = billRetryLimit.check(args.billId);
-      if (!retryLimit.allowed) throw new RetryLimitError(retryLimit.retryAfterSeconds);
-    }
-
-    const models = await getActiveModels();
-    if (models.length === 0) throw new NoModelsConfiguredError();
-
-    const created = args.billId ? undefined : await createBill();
-    if (created?.hostToken && process.env.NODE_ENV !== "test") {
-      await setHostTokenCookie(created.bill.id, created.hostToken, created.bill.expiresAt);
-    }
-    let bill = args.billId ? await fetchBillById(args.billId) : created!.bill;
-
-    emit({ type: "scan.started", modelCount: models.length });
-    const ocrResult = await runOcr({ billId: bill.id, image, models });
+    emit({ type: "scan.started", modelCount: prepared.models.length });
+    const ocrResult = await runOcr({ billId: prepared.bill.id, image: prepared.image, models: prepared.models });
 
     for (const run of ocrResult.runs) {
       if (run.ok) {
@@ -194,7 +250,7 @@ export async function runScan(args: RunScanArgs): Promise<RunScanResult> {
     const voted = voteOcr(ocrResult.runs, quorumOverride ? { quorum: () => quorumOverride } : undefined);
     emit({ type: "voting.done", itemsCount: voted.items.length, subtotalMismatch: voted.subtotalMismatch });
 
-    bill = await replaceItems(bill, voted.items);
+    let bill = await replaceItems(prepared.bill, voted.items);
     bill = await updateBillSummary(bill, {
       taxCents: voted.taxCents,
       tip: { type: "FLAT", value: voted.tipCents },
@@ -202,14 +258,14 @@ export async function runScan(args: RunScanArgs): Promise<RunScanResult> {
     });
 
     ipScanLimit.consume(args.ip);
-    if (args.billId) billRetryLimit.consume(args.billId);
+    if (!prepared.isNewBill) billRetryLimit.consume(prepared.bill.id);
     llmBudget.record(ocrResult.totalCostUsd);
 
     emit({ type: "scan.complete", billShareToken: bill.shareToken, billId: bill.id });
 
     return {
       shareToken: bill.shareToken,
-      hostToken: created?.hostToken,
+      hostToken: prepared.hostToken,
       billId: bill.id,
       billExpiresAt: bill.expiresAt,
       votingMismatch: voted.subtotalMismatch,
@@ -218,4 +274,22 @@ export async function runScan(args: RunScanArgs): Promise<RunScanResult> {
     emit(scanFailedEventForError(err));
     throw err;
   }
+}
+
+/**
+ * Backwards-compatible composed entry point. Non-streaming callers and tests
+ * use this. Streaming callers should use prepareScan + executeScan directly so
+ * they can set the host cookie synchronously on the outgoing response before
+ * the stream emits.
+ */
+export async function runScan(args: RunScanArgs): Promise<RunScanResult> {
+  const emit = args.onEvent ?? (() => undefined);
+  let prepared: PreparedScan;
+  try {
+    prepared = await prepareScan({ imageBuffer: args.imageBuffer, ip: args.ip, billId: args.billId });
+  } catch (err) {
+    emit(scanFailedEventForError(err));
+    throw err;
+  }
+  return executeScan({ prepared, ip: args.ip, onEvent: args.onEvent });
 }

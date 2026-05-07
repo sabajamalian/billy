@@ -8,8 +8,11 @@ import {
   NoModelsConfiguredError,
   RateLimitError,
   RetryLimitError,
+  executeScan,
+  prepareScan,
   runScan,
   scanFailedEventForError,
+  type PreparedScan,
   type ScanEvent,
 } from "@/server/scan/orchestrator";
 
@@ -51,7 +54,24 @@ export async function POST(request: Request, ctx: RouteContext) {
   }
 }
 
-function streamRescan(request: Request, billId: string): Response {
+async function streamRescan(request: Request, billId: string): Promise<Response> {
+  const ip = clientIp(request);
+
+  let imageBuffer: Buffer;
+  try {
+    imageBuffer = await parseImage(request);
+  } catch (err) {
+    return errorResponse(err);
+  }
+
+  let prepared: PreparedScan | null = null;
+  let preflightError: unknown = null;
+  try {
+    prepared = await prepareScan({ imageBuffer, ip, billId });
+  } catch (err) {
+    preflightError = err;
+  }
+
   const encoder = new TextEncoder();
   const send = (controller: ReadableStreamDefaultController<Uint8Array>, event: ScanEvent) => {
     controller.enqueue(encoder.encode(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`));
@@ -59,20 +79,25 @@ function streamRescan(request: Request, billId: string): Response {
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
-      let failedSent = false;
       void (async () => {
         try {
-          await runScan({
-            imageBuffer: await parseImage(request),
-            ip: clientIp(request),
-            billId,
-            onEvent: (event) => {
-              if (event.type === "scan.failed") failedSent = true;
-              send(controller, event);
-            },
-          });
-        } catch (err) {
-          if (!failedSent) send(controller, scanFailedEventForError(err));
+          if (preflightError || !prepared) {
+            send(controller, scanFailedEventForError(preflightError ?? new Error("Scan failed")));
+            return;
+          }
+          let failedSent = false;
+          try {
+            await executeScan({
+              prepared,
+              ip,
+              onEvent: (event) => {
+                if (event.type === "scan.failed") failedSent = true;
+                send(controller, event);
+              },
+            });
+          } catch (err) {
+            if (!failedSent) send(controller, scanFailedEventForError(err));
+          }
         } finally {
           controller.close();
         }

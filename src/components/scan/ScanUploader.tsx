@@ -254,15 +254,21 @@ export function ScanUploader({ existingShareToken }: ScanUploaderProps) {
         body: formData,
       });
 
-      if (!response.ok && !response.body) {
+      const contentType = response.headers.get("content-type") ?? "";
+      const isEventStream = contentType.includes("text/event-stream");
+
+      if (!response.ok && !isEventStream) {
         const payload = (await response.json().catch(() => null)) as { detail?: string; error?: string } | null;
         throw new Error(payload?.detail ?? payload?.error ?? "Scan failed");
       }
 
-      if (!response.body) {
-        const payload = (await response.json()) as { shareToken: string };
-        router.push(`/b/${payload.shareToken}`);
-        return;
+      if (!isEventStream || !response.body) {
+        const payload = (await response.json().catch(() => null)) as { shareToken?: string } | null;
+        if (payload?.shareToken) {
+          router.push(`/b/${payload.shareToken}`);
+          return;
+        }
+        throw new Error("Scan failed: server did not return a stream");
       }
 
       await readEventStream(response.body, applyEvent);

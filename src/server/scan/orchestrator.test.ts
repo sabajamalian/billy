@@ -251,3 +251,55 @@ describe("runScan", () => {
     expect(result.hostToken).toBeUndefined();
   });
 });
+
+describe("prepareScan + executeScan", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupHappyMocks();
+  });
+
+  it("prepareScan creates the bill and returns a hostToken for new scans", async () => {
+    const { prepareScan } = await import("@/server/scan/orchestrator");
+
+    const prepared = await prepareScan({ imageBuffer: Buffer.from("receipt"), ip: "1.2.3.4" });
+
+    expect(createBillMock).toHaveBeenCalledTimes(1);
+    expect(prepared.isNewBill).toBe(true);
+    expect(prepared.hostToken).toBe("host-1");
+    expect(prepared.bill.id).toBe("bill-1");
+    expect(prepared.models).toHaveLength(2);
+  });
+
+  it("prepareScan does not create a bill for rescans and returns no hostToken", async () => {
+    const { prepareScan } = await import("@/server/scan/orchestrator");
+
+    const prepared = await prepareScan({ imageBuffer: Buffer.from("receipt"), ip: "1.2.3.4", billId: "bill-1" });
+
+    expect(createBillMock).not.toHaveBeenCalled();
+    expect(prepared.isNewBill).toBe(false);
+    expect(prepared.hostToken).toBeUndefined();
+  });
+
+  it("prepareScan does not create the bill before image validation succeeds", async () => {
+    preprocessImageMock.mockRejectedValue(new ImageValidationError("BAD_MAGIC", "bad image"));
+    const { prepareScan, ImageError } = await import("@/server/scan/orchestrator");
+
+    await expect(prepareScan({ imageBuffer: Buffer.from("receipt"), ip: "1.2.3.4" })).rejects.toBeInstanceOf(ImageError);
+
+    expect(createBillMock).not.toHaveBeenCalled();
+  });
+
+  it("executeScan persists voted items and emits scan.complete", async () => {
+    const { prepareScan, executeScan } = await import("@/server/scan/orchestrator");
+    const events: unknown[] = [];
+
+    const prepared = await prepareScan({ imageBuffer: Buffer.from("receipt"), ip: "1.2.3.4" });
+    const result = await executeScan({ prepared, ip: "1.2.3.4", onEvent: (event) => events.push(event) });
+
+    expect(replaceItemsMock).toHaveBeenCalledWith(expect.objectContaining({ id: "bill-1" }), votedBill().items);
+    expect(updateBillSummaryMock).toHaveBeenCalledTimes(1);
+    expect(events).toContainEqual(expect.objectContaining({ type: "scan.complete" }));
+    expect(result.shareToken).toBe("share-1");
+    expect(result.hostToken).toBe("host-1");
+  });
+});
