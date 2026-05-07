@@ -1,11 +1,12 @@
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
 import { customAlphabet } from "nanoid";
 
-// Tokens are 192 bits, base62-encoded. ~33 chars. Unguessable.
+// Share tokens are 10 chars from a 62-char alphabet ≈ 59 bits of entropy.
+// Bills auto-expire on a short TTL, so guessing is infeasible.
 const URL_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const makeShareToken = customAlphabet(URL_ALPHABET, 24);
+const makeShareToken = customAlphabet(URL_ALPHABET, 10);
 
-/** Public-ish token used as the bill share URL slug. ~24 chars, unguessable. */
+/** Public-ish token used as the bill share URL slug. 10 chars, unguessable for the bill's TTL. */
 export const generateShareToken = () => makeShareToken();
 
 /** High-entropy capability token (e.g. host token). Hex-encoded; 48 chars. */

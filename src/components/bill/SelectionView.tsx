@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2Icon, PencilIcon, QrCodeIcon, UserRoundIcon } from "lucide-react";
+import { Loader2Icon, QrCodeIcon, UserRoundIcon } from "lucide-react";
 
 import { NicknameDialog } from "@/components/bill/NicknameDialog";
 import { SelectionRow } from "@/components/bill/SelectionRow";
@@ -126,9 +125,6 @@ export function SelectionView({ initialBill, isHost }: Props) {
                 onClick={() => setQrOpen(true)}
               >
                 <QrCodeIcon aria-hidden="true" /> Share link
-              </Button>
-              <Button variant="outline" className="min-h-11" render={<Link href={`/b/${bill.shareToken}/edit`} />}>
-                <PencilIcon aria-hidden="true" /> Edit bill
               </Button>
             </div>
           )}
