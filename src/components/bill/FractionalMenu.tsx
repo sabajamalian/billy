@@ -17,7 +17,9 @@ type Props = {
 
 const OPTIONS = [
   { label: "¼", value: 0.25 },
+  { label: "⅓", value: 1 / 3 },
   { label: "½", value: 0.5 },
+  { label: "⅔", value: 2 / 3 },
   { label: "¾", value: 0.75 },
   { label: "1", value: 1 },
   { label: "1½", value: 1.5 },
@@ -52,12 +54,12 @@ export function FractionalMenu({ open, onOpenChange, current, maxShares = Infini
           <SheetTitle>Choose your share</SheetTitle>
           <SheetDescription>Use fractions for shared dishes or enter a custom amount.</SheetDescription>
         </SheetHeader>
-        <div className="grid grid-cols-3 gap-3 px-4">
+        <div className="grid grid-cols-4 gap-3 px-4">
           {OPTIONS.map((option) => (
             <Button
               key={option.label}
               type="button"
-              variant={current === option.value ? "default" : "outline"}
+              variant={Math.abs(current - option.value) < 0.001 ? "default" : "outline"}
               className="min-h-11 text-lg"
               disabled={option.value > maxShares}
               onClick={() => pick(option.value)}
@@ -68,7 +70,7 @@ export function FractionalMenu({ open, onOpenChange, current, maxShares = Infini
           <Button
             type="button"
             variant="outline"
-            className="col-span-3 min-h-11"
+            className="col-span-4 min-h-11"
             onClick={() => setShowCustom((value) => !value)}
           >
             Custom…

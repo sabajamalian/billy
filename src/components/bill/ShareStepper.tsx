@@ -16,13 +16,25 @@ type Props = {
 
 const LONG_PRESS_MS = 500;
 
+const FRACTION_GLYPHS: Array<[number, string]> = [
+  [1 / 3, "⅓"],
+  [2 / 3, "⅔"],
+  [0.25, "¼"],
+  [0.5, "½"],
+  [0.75, "¾"],
+];
+
 function formatShareDisplay(shares: number): string {
   const whole = Math.trunc(shares);
-  const fraction = Math.round((shares - whole) * 100) / 100;
-  const glyph = fraction === 0.25 ? "¼" : fraction === 0.5 ? "½" : fraction === 0.75 ? "¾" : "";
+  const fraction = shares - whole;
 
-  if (glyph) return whole > 0 ? `${whole}${glyph}` : glyph;
-  if (Number.isInteger(shares)) return String(shares);
+  for (const [value, glyph] of FRACTION_GLYPHS) {
+    if (Math.abs(fraction - value) < 0.01) {
+      return whole > 0 ? `${whole}${glyph}` : glyph;
+    }
+  }
+
+  if (Math.abs(fraction) < 0.01) return String(whole);
   return shares.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 }
 

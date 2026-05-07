@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangleIcon, CircleAlertIcon } from "lucide-react";
+import { AlertTriangleIcon, CircleAlertIcon, UsersIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -81,7 +81,7 @@ export function SelectionRow({ item, shares, currency, onSharesChange }: Props) 
           {item.quantity > 1 ? (
             <span className="max-w-36 text-sm text-muted-foreground">How many units did you have?</span>
           ) : (
-            <span className="text-sm text-muted-foreground">Your share</span>
+            <span className="text-sm text-muted-foreground">Tap card to add a share</span>
           )}
           <div onClick={(event) => event.stopPropagation()}>
             <ShareStepper
@@ -93,6 +93,23 @@ export function SelectionRow({ item, shares, currency, onSharesChange }: Props) 
             />
           </div>
         </div>
+
+        <button
+          type="button"
+          className={cn(
+            "-mx-2 flex min-h-11 items-center justify-center gap-2 rounded-lg border border-dashed border-border/70 px-3 text-sm font-medium text-muted-foreground transition-colors",
+            "hover:border-primary/50 hover:bg-primary/5 hover:text-foreground",
+            "focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+          )}
+          onClick={(event) => {
+            event.stopPropagation();
+            setFractionalOpen(true);
+          }}
+          aria-haspopup="dialog"
+        >
+          <UsersIcon aria-hidden="true" className="size-4" />
+          Sharing this? Pick a fraction (¼ · ⅓ · ½ · …)
+        </button>
       </CardContent>
       <FractionalMenu
         open={fractionalOpen}
