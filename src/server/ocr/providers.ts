@@ -46,13 +46,43 @@ Conventions:
 - Item names: keep concise (≤ 100 chars), preserve original ordering.
 - Currency: ISO 4217 code (e.g. "USD", "EUR", "GBP"). Default "USD" if unclear.`;
 
+// Pricing per 1M tokens, USD. Used by the admin Spend dashboard.
+// Updated May 2026 — Anthropic 4.x, OpenAI 5.x, Gemini 2.5 / 3.x.
+// Add new model rows here as providers ship them; cost-tracking falls back
+// to null (no spend recorded) when a row is missing.
 export const PRICING_PER_MTOKEN_USD: Record<string, { input: number; output: number }> = {
+  // Anthropic (vision-capable)
+  "anthropic:claude-opus-4-7": { input: 5, output: 25 },
+  "anthropic:claude-opus-4-6": { input: 5, output: 25 },
+  "anthropic:claude-opus-4-5": { input: 5, output: 25 },
+  "anthropic:claude-sonnet-4-6": { input: 3, output: 15 },
+  "anthropic:claude-sonnet-4-5": { input: 3, output: 15 },
+  "anthropic:claude-haiku-4-5": { input: 1, output: 5 },
+
+  // OpenAI (vision-capable)
+  "openai:gpt-5.5": { input: 5, output: 30 },
+  "openai:gpt-5.4": { input: 2.5, output: 15 },
+  "openai:gpt-5.4-mini": { input: 0.75, output: 4.5 },
+  "openai:gpt-5.4-nano": { input: 0.2, output: 1.25 },
+  "openai:gpt-5.1": { input: 1.25, output: 10 },
+  "openai:gpt-5": { input: 1.25, output: 10 },
+  "openai:gpt-5-mini": { input: 0.25, output: 2 },
+  "openai:gpt-4.1": { input: 2, output: 8 },
+  "openai:gpt-4.1-mini": { input: 0.4, output: 1.6 },
+  "openai:gpt-4.1-nano": { input: 0.1, output: 0.4 },
   "openai:gpt-4o": { input: 2.5, output: 10 },
-  "openai:gpt-4o-mini": { input: 0.15, output: 0.6 },
-  "anthropic:claude-3-5-sonnet-20241022": { input: 3, output: 15 },
-  "anthropic:claude-3-5-haiku-20241022": { input: 0.8, output: 4 },
-  "google:gemini-1.5-pro": { input: 1.25, output: 5 },
-  "google:gemini-1.5-flash": { input: 0.075, output: 0.3 },
+
+  // Google (vision-capable). Preview model IDs may rename — verify with Google docs.
+  "google:gemini-3.1-pro-preview": { input: 2, output: 12 },
+  "google:gemini-3-pro-preview": { input: 2, output: 12 },
+  "google:gemini-3-flash-preview": { input: 0.5, output: 3 },
+  "google:gemini-3.1-flash-lite-preview": { input: 0.25, output: 1.5 },
+  "google:gemini-2.5-pro": { input: 1.25, output: 10 },
+  "google:gemini-2.5-flash": { input: 0.3, output: 2.5 },
+  "google:gemini-2.5-flash-lite": { input: 0.1, output: 0.4 },
+  "google:gemini-2.0-flash": { input: 0.1, output: 0.4 },
+  "google:gemini-pro-latest": { input: 2, output: 12 },
+  "google:gemini-flash-latest": { input: 0.3, output: 2.5 },
 };
 
 export function getConfiguredModels(): ConfiguredModel[] {

@@ -9,7 +9,8 @@ const envSchema = z.object({
   ANTHROPIC_API_KEY: z.string().optional(),
   GOOGLE_GENERATIVE_AI_API_KEY: z.string().optional(),
 
-  // Comma-separated list of enabled provider:model pairs (e.g. "openai:gpt-4o,anthropic:claude-sonnet-4-5")
+  // Comma-separated list of enabled provider:model pairs.
+  // Examples: "anthropic:claude-sonnet-4-5", "openai:gpt-5.4", "google:gemini-2.5-pro"
   // Empty/unset means OCR is unavailable; the admin panel can override at runtime.
   BILLY_OCR_MODELS: z.string().optional(),
 
