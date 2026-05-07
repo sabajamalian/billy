@@ -14,7 +14,7 @@ const envSchema = z.object({
   BILLY_OCR_MODELS: z.string().optional(),
 
   // Admin gate. If unset, /admin is disabled.
-  ADMIN_PASSWORD: z.string().min(8).optional(),
+  ADMIN_PASSWORD: z.string().min(4).optional(),
 
   // Cost guardrail (USD). Soft cap per UTC day. 0 disables.
   BILLY_DAILY_LLM_COST_USD: z.coerce.number().nonnegative().default(50),
