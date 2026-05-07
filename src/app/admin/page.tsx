@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { env, isAdminEnabled } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { ADMIN_COOKIE_NAME, verifyAdminCookie } from "@/server/admin/auth";
+import { getAllProviderKeyStatus } from "@/server/admin/provider-keys";
 import { getActiveModels, getQuorumOverride } from "@/server/admin/settings";
 import { PRICING_PER_MTOKEN_USD } from "@/server/ocr/providers";
 
@@ -58,7 +59,7 @@ export default async function AdminPage() {
   const store = await cookies();
   if (!verifyAdminCookie(store.get(ADMIN_COOKIE_NAME)?.value ?? "")) redirect("/admin/login");
 
-  const [activeModels, quorumOverride, spend, runs] = await Promise.all([
+  const [activeModels, quorumOverride, spend, runs, providerKeyStatus] = await Promise.all([
     getActiveModels(),
     getQuorumOverride(),
     getSpend(),
@@ -78,7 +79,14 @@ export default async function AdminPage() {
         createdAt: true,
       },
     }),
+    getAllProviderKeyStatus(),
   ]);
+
+  const providerKeysPresent = {
+    openai: providerKeyStatus.openai.source === "db" || providerKeyStatus.openai.source === "env",
+    anthropic: providerKeyStatus.anthropic.source === "db" || providerKeyStatus.anthropic.source === "env",
+    google: providerKeyStatus.google.source === "db" || providerKeyStatus.google.source === "env",
+  };
 
   return (
     <AdminDashboard
@@ -86,11 +94,8 @@ export default async function AdminPage() {
         activeModels,
         availableModels: Object.keys(PRICING_PER_MTOKEN_USD),
         quorumOverride,
-        providerKeysPresent: {
-          openai: Boolean(env.OPENAI_API_KEY),
-          anthropic: Boolean(env.ANTHROPIC_API_KEY),
-          google: Boolean(env.GOOGLE_GENERATIVE_AI_API_KEY),
-        },
+        providerKeysPresent,
+        providerKeyStatus,
       }}
       spend={spend}
       runs={runs.map((run) => ({ ...run, createdAt: run.createdAt.toISOString() }))}

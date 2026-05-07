@@ -1,6 +1,6 @@
-import { anthropic } from "@ai-sdk/anthropic";
-import { google } from "@ai-sdk/google";
-import { openai } from "@ai-sdk/openai";
+import { createAnthropic } from "@ai-sdk/anthropic";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
 import { generateObject, type LanguageModel, type LanguageModelUsage } from "ai";
 
 import { prisma } from "@/lib/prisma";
@@ -8,6 +8,7 @@ import { findCachedOcrRun } from "@/server/ocr/cache";
 import type { PreprocessedImage } from "@/server/ocr/preprocess";
 import { ocrParseSchema, toOcrParseResult, type OcrParseResult } from "@/server/ocr/schema";
 import type { OcrRun as VotingOcrRun } from "@/server/ocr/voting";
+import { resolveProviderApiKey } from "@/server/admin/provider-keys";
 
 export type ProviderId = "openai" | "anthropic" | "google";
 
@@ -106,11 +107,18 @@ export function activeModelSetKey(models: ConfiguredModel[]): string {
   return [...models].map(({ provider, model }) => `${provider}:${model}`).sort().join(",");
 }
 
-const providerModelFor = ({ provider, model }: ConfiguredModel): LanguageModel => {
-  if (provider === "openai") return openai(model);
-  if (provider === "anthropic") return anthropic(model);
-  return google(model);
+const providerModelFor = ({ provider, model }: ConfiguredModel, apiKey: string): LanguageModel => {
+  if (provider === "openai") return createOpenAI({ apiKey })(model);
+  if (provider === "anthropic") return createAnthropic({ apiKey })(model);
+  return createGoogleGenerativeAI({ apiKey })(model);
 };
+
+export class OcrConfigError extends Error {
+  constructor(public readonly code: string, message?: string) {
+    super(message ?? code);
+    this.name = "OcrConfigError";
+  }
+}
 
 const errorMessage = (err: unknown): string => {
   if (err instanceof Error) return err.message;
@@ -160,7 +168,7 @@ const runOneModel = async ({
   const started = Date.now();
 
   const makeFailure = async (err: unknown, latencyMs = Date.now() - started): Promise<OcrRun> => {
-    const error = errorMessage(err);
+    const error = err instanceof OcrConfigError ? err.code : errorMessage(err);
     await prisma.ocrRun.create({
       data: {
         billId,
@@ -192,10 +200,18 @@ const runOneModel = async ({
       };
     }
 
+    const resolved = await resolveProviderApiKey(model.provider);
+    if (resolved.source === "none") {
+      return makeFailure(new OcrConfigError("provider_api_key_missing"));
+    }
+    if (resolved.source === "error") {
+      return makeFailure(new OcrConfigError("provider_api_key_decrypt_failed"));
+    }
+
     const abort = buildAbortSignal(signal);
     try {
       const response = await generateObject({
-        model: providerModelFor(model),
+        model: providerModelFor(model, resolved.apiKey),
         schema: ocrParseSchema,
         system: SYSTEM_PROMPT,
         messages: [

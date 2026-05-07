@@ -51,3 +51,4 @@ data/billy.test.db*
 /data/billy.db*
 /data/uploads/*
 !/data/uploads/.gitkeep
+/data/.encryption-key

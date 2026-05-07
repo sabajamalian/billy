@@ -13,12 +13,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatCents } from "@/lib/utils";
 import type { ConfiguredModel } from "@/server/ocr/providers";
 
+type ProviderId = "openai" | "anthropic" | "google";
+type KeySource = "db" | "env" | "none" | "error";
+type ProviderKeyStatus = { source: KeySource; last4: string | null };
 type ProviderKeysPresent = { openai: boolean; anthropic: boolean; google: boolean };
+type ProviderKeyStatusMap = Record<ProviderId, ProviderKeyStatus>;
 type SettingsData = {
   activeModels: ConfiguredModel[];
   availableModels: string[];
   quorumOverride: number | null;
   providerKeysPresent: ProviderKeysPresent;
+  providerKeyStatus: ProviderKeyStatusMap;
 };
 type SpendData = {
   today: { spentUsd: number; capUsd: number };
@@ -52,6 +57,9 @@ export function AdminDashboard({ settings, spend, runs }: AdminDashboardProps) {
   const [quorum, setQuorum] = useState(settings.quorumOverride?.toString() ?? "");
   const [savingModels, setSavingModels] = useState(false);
   const [savingQuorum, setSavingQuorum] = useState(false);
+  const [keyStatus, setKeyStatus] = useState<ProviderKeyStatusMap>(settings.providerKeyStatus);
+  const [keyDrafts, setKeyDrafts] = useState<Record<ProviderId, string>>({ openai: "", anthropic: "", google: "" });
+  const [keyBusy, setKeyBusy] = useState<ProviderId | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const visibleRuns = useMemo(() => runs.slice(page * 50, page * 50 + 50), [runs, page]);
@@ -84,6 +92,54 @@ export function AdminDashboard({ settings, spend, runs }: AdminDashboardProps) {
     await patchSettings({ quorumOverride: value }).finally(() => setSavingQuorum(false));
   }
 
+  async function saveProviderKey(provider: ProviderId) {
+    const apiKey = keyDrafts[provider].trim();
+    if (!apiKey) return;
+    setKeyBusy(provider);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/admin/keys", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider, apiKey }),
+      });
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({}));
+        setMessage(`Save failed: ${(detail as { detail?: string }).detail ?? response.statusText}`);
+        return;
+      }
+      const data = (await response.json()) as { providers: ProviderKeyStatusMap };
+      setKeyStatus(data.providers);
+      setKeyDrafts((current) => ({ ...current, [provider]: "" }));
+      setMessage(`Saved ${provider} key.`);
+      router.refresh();
+    } finally {
+      setKeyBusy(null);
+    }
+  }
+
+  async function clearProviderKey(provider: ProviderId) {
+    setKeyBusy(provider);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/admin/keys", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider }),
+      });
+      if (!response.ok) {
+        setMessage(`Clear failed: ${response.statusText}`);
+        return;
+      }
+      const data = (await response.json()) as { providers: ProviderKeyStatusMap };
+      setKeyStatus(data.providers);
+      setMessage(`Cleared ${provider} key.`);
+      router.refresh();
+    } finally {
+      setKeyBusy(null);
+    }
+  }
+
   async function logout() {
     await fetch("/api/admin/logout", { method: "POST" });
     router.replace("/admin/login");
@@ -106,6 +162,7 @@ export function AdminDashboard({ settings, spend, runs }: AdminDashboardProps) {
         <Tabs defaultValue="models">
           <TabsList className="w-full justify-start overflow-x-auto">
             <TabsTrigger value="models">Models</TabsTrigger>
+            <TabsTrigger value="keys">Keys</TabsTrigger>
             <TabsTrigger value="spend">Spend</TabsTrigger>
             <TabsTrigger value="runs">OCR Runs</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
@@ -147,6 +204,63 @@ export function AdminDashboard({ settings, spend, runs }: AdminDashboardProps) {
                 <Button onClick={saveModels} disabled={savingModels}>
                   {savingModels ? "Saving…" : "Save models"}
                 </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="keys">
+            <Card>
+              <CardHeader>
+                <CardTitle>Provider API keys</CardTitle>
+                <CardDescription>
+                  Stored encrypted at rest. DB-stored keys take precedence over environment variables.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {(["openai", "anthropic", "google"] as const).map((provider) => {
+                  const status = keyStatus[provider];
+                  const draft = keyDrafts[provider];
+                  const busy = keyBusy === provider;
+                  return (
+                    <div key={provider} className="space-y-2 rounded-lg border p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-sm font-medium">{provider}</span>
+                          <KeyStatusBadge status={status} />
+                        </div>
+                        {status.source === "db" || status.source === "error" ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={busy}
+                            onClick={() => clearProviderKey(provider)}
+                          >
+                            {busy ? "…" : "Clear"}
+                          </Button>
+                        ) : null}
+                      </div>
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <Input
+                          type="password"
+                          autoComplete="off"
+                          placeholder={`Paste ${provider} API key`}
+                          value={draft}
+                          onChange={(event) =>
+                            setKeyDrafts((current) => ({ ...current, [provider]: event.target.value }))
+                          }
+                          aria-label={`${provider} API key`}
+                        />
+                        <Button onClick={() => saveProviderKey(provider)} disabled={busy || draft.trim().length === 0}>
+                          {busy ? "Saving…" : "Save"}
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+                <p className="text-xs text-muted-foreground">
+                  Keys are encrypted with AES-256-GCM. Set <code className="rounded bg-muted px-1 py-0.5">BILLY_KEY_ENCRYPTION_SECRET</code>
+                  {" "}(64 hex chars) to use a host-managed master key, otherwise one is generated and persisted alongside the database.
+                </p>
               </CardContent>
             </Card>
           </TabsContent>
@@ -248,4 +362,17 @@ function SimpleTable({ headers, rows }: { headers: string[]; rows: string[][] })
       </div>
     </div>
   );
+}
+
+function KeyStatusBadge({ status }: { status: ProviderKeyStatus }) {
+  if (status.source === "db") {
+    return <Badge variant="secondary">DB · ****{status.last4 ?? "????"}</Badge>;
+  }
+  if (status.source === "env") {
+    return <Badge variant="outline">env</Badge>;
+  }
+  if (status.source === "error") {
+    return <Badge variant="destructive">decrypt failed</Badge>;
+  }
+  return <Badge variant="outline">not set</Badge>;
 }

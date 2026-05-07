@@ -14,6 +14,11 @@ const envSchema = z.object({
   // Empty/unset means OCR is unavailable; the admin panel can override at runtime.
   BILLY_OCR_MODELS: z.string().optional(),
 
+  // Optional master key for encrypting admin-stored provider API keys.
+  // 64 hex chars (32 bytes). If unset, a random key is auto-generated and
+  // persisted to <data dir>/.encryption-key (mode 0600).
+  BILLY_KEY_ENCRYPTION_SECRET: z.string().optional(),
+
   // Admin gate. If unset, /admin is disabled.
   ADMIN_PASSWORD: z.string().min(4).optional(),
 

@@ -8,6 +8,9 @@ const ocrRunMock = {
   create: vi.fn().mockResolvedValue({}),
   findFirst: vi.fn().mockResolvedValue(null),
 };
+const adminSettingMock = {
+  findUnique: vi.fn().mockResolvedValue(null),
+};
 
 vi.mock("ai", async (importOriginal) => {
   const actual = await importOriginal<typeof import("ai")>();
@@ -15,7 +18,7 @@ vi.mock("ai", async (importOriginal) => {
 });
 
 vi.mock("@/lib/prisma", () => ({
-  prisma: { ocrRun: ocrRunMock },
+  prisma: { ocrRun: ocrRunMock, adminSetting: adminSettingMock },
 }));
 
 const validRaw: OcrParseRaw = {
@@ -39,9 +42,13 @@ const image: PreprocessedImage = {
 describe("OCR providers", () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
+    vi.stubEnv("OPENAI_API_KEY", "sk-test-openai");
+    vi.stubEnv("ANTHROPIC_API_KEY", "sk-test-anthropic");
+    vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "g-test");
     vi.clearAllMocks();
     ocrRunMock.create.mockResolvedValue({});
     ocrRunMock.findFirst.mockResolvedValue(null);
+    adminSettingMock.findUnique.mockResolvedValue(null);
     generateObjectMock.mockResolvedValue({
       object: validRaw,
       usage: { inputTokens: 1000, outputTokens: 100, inputTokenDetails: {}, outputTokenDetails: {}, totalTokens: 1100 },

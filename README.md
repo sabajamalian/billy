@@ -43,9 +43,20 @@ Billy is designed for self-hosting as a single Docker image. From the repository
 docker compose up -d --build
 ```
 
-The compose file loads `.env` with `DATABASE_URL`, `ADMIN_PASSWORD`, Billy settings such as `BILLY_OCR_MODELS`, `BILLY_BILL_TTL_DAYS`, `BILLY_DAILY_LLM_COST_USD`, `BILLY_PER_BILL_RETRY_LIMIT`, and `BILLY_PER_IP_SCAN_LIMIT`, plus provider keys such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, and `GOOGLE_GENERATIVE_AI_API_KEY` when those OCR models are enabled. The container defaults to `DATABASE_URL=file:/app/data/billy.db`; the compose bind mount stores that database under `./data` on the host.
+The compose file loads `.env` with `DATABASE_URL`, `ADMIN_PASSWORD`, Billy settings such as `BILLY_OCR_MODELS`, `BILLY_BILL_TTL_DAYS`, `BILLY_DAILY_LLM_COST_USD`, `BILLY_PER_BILL_RETRY_LIMIT`, `BILLY_PER_IP_SCAN_LIMIT`, and the optional `BILLY_KEY_ENCRYPTION_SECRET` (see below), plus provider keys such as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, and `GOOGLE_GENERATIVE_AI_API_KEY` when those OCR models are enabled. The container defaults to `DATABASE_URL=file:/app/data/billy.db`; the compose bind mount stores that database under `./data` on the host.
 
 For OCR, set `BILLY_OCR_MODELS` to a comma-separated `provider:model` list — for example `"anthropic:claude-sonnet-4-5,openai:gpt-5.4,google:gemini-2.5-flash"`. Running at least two providers enables genuine voting between them. The admin panel at `/admin` lets you toggle the active set at runtime; the env var becomes the fallback for first boot.
+
+### Provider API keys
+
+You can supply provider API keys two ways:
+
+1. **Environment variables** (recommended for hardened deployments) — `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`.
+2. **Admin → Keys tab** at runtime — keys are encrypted with AES-256-GCM and stored in the SQLite `AdminSetting` table. Stored keys take precedence over env vars; clear them to fall back to the env var.
+
+The encryption master key is sourced from `BILLY_KEY_ENCRYPTION_SECRET` (64 hex chars, 32 bytes) if set, otherwise auto-generated and persisted at `data/.encryption-key` (mode 0600). For Docker/Kubernetes deploys, prefer setting `BILLY_KEY_ENCRYPTION_SECRET` from your secret manager so the encrypted blobs in the DB are not decryptable just from a stolen DB. If you keep the auto-generated keyfile, back it up alongside `data/billy.db` — losing the keyfile makes any DB-stored API keys unrecoverable.
+
+To rotate the encryption secret, clear all DB-stored keys via the admin panel first (or accept that they will appear as `decrypt failed` and need re-entering), then update `BILLY_KEY_ENCRYPTION_SECRET` and restart.
 
 Set a strong `ADMIN_PASSWORD` in `.env`, start the service, then visit `http://localhost:3000/admin` to access admin features. Keep `.env` private and never commit provider keys or the admin password.
 

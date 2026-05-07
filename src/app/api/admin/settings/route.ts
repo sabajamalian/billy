@@ -1,17 +1,11 @@
 import { NextResponse } from "next/server";
 
-import { env } from "@/lib/env";
 import { ensureAdmin } from "@/server/admin/http";
+import { getAllProviderKeyStatus } from "@/server/admin/provider-keys";
 import { getActiveModels, getQuorumOverride, setActiveModels, setQuorumOverride } from "@/server/admin/settings";
 import { PRICING_PER_MTOKEN_USD, type ConfiguredModel, type ProviderId } from "@/server/ocr/providers";
 
 export const dynamic = "force-dynamic";
-
-const providerKeysPresent = () => ({
-  openai: Boolean(env.OPENAI_API_KEY),
-  anthropic: Boolean(env.ANTHROPIC_API_KEY),
-  google: Boolean(env.GOOGLE_GENERATIVE_AI_API_KEY),
-});
 
 const providers = new Set<ProviderId>(["openai", "anthropic", "google"]);
 
@@ -27,11 +21,20 @@ const parseModels = (value: unknown): ConfiguredModel[] | undefined => {
   });
 };
 
+const providerKeysPresent = async () => {
+  const status = await getAllProviderKeyStatus();
+  return {
+    openai: status.openai.source === "db" || status.openai.source === "env",
+    anthropic: status.anthropic.source === "db" || status.anthropic.source === "env",
+    google: status.google.source === "db" || status.google.source === "env",
+  };
+};
+
 const payload = async () => ({
   activeModels: await getActiveModels(),
   availableModels: Object.keys(PRICING_PER_MTOKEN_USD),
   quorumOverride: await getQuorumOverride(),
-  providerKeysPresent: providerKeysPresent(),
+  providerKeysPresent: await providerKeysPresent(),
 });
 
 export async function GET() {
