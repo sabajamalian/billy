@@ -15,6 +15,8 @@ import {
   generateShareToken,
   hashCapabilityToken,
   verifyCapabilityToken,
+  SHARE_TOKEN_MIN_LENGTH,
+  SHARE_TOKEN_MAX_LENGTH,
 } from "@/lib/tokens";
 import { readHostTokenCookie } from "@/lib/cookies";
 import { Prisma, type Bill, type Item } from "@/generated/prisma/client";
@@ -59,24 +61,47 @@ const resolveTipCents = (
 const computeSubtotalCents = (items: Pick<Item, "unitPriceCents" | "quantity">[]): number =>
   items.reduce((sum, i) => sum + i.unitPriceCents * i.quantity, 0);
 
+/** Retries before bumping the share-token length on collision. */
+const SHARE_TOKEN_RETRIES_PER_LENGTH = 3;
+
+const isShareTokenCollision = (err: unknown): boolean => {
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError)) return false;
+  if (err.code !== "P2002") return false;
+  const target = (err.meta as { target?: unknown } | undefined)?.target;
+  if (Array.isArray(target)) return target.includes("shareToken");
+  if (typeof target === "string") return target.includes("shareToken");
+  return false;
+};
+
 /** Create a fresh bill with no items yet. Returns plaintext tokens (only this once). */
 export async function createBill(): Promise<CreateBillResult> {
-  const shareToken = generateShareToken();
   const hostToken = generateCapabilityToken();
   const hostTokenHash = hashCapabilityToken(hostToken);
   const expiresAt = ttlExpiresAt();
 
-  const bill = await prisma.bill.create({
-    data: {
-      shareToken,
-      hostTokenHash,
-      status: "SCANNING",
-      expiresAt,
-    },
-    include: { items: true },
-  });
+  let lastError: unknown;
+  for (let length = SHARE_TOKEN_MIN_LENGTH; length <= SHARE_TOKEN_MAX_LENGTH; length++) {
+    for (let attempt = 0; attempt < SHARE_TOKEN_RETRIES_PER_LENGTH; attempt++) {
+      const shareToken = generateShareToken(length);
+      try {
+        const bill = await prisma.bill.create({
+          data: {
+            shareToken,
+            hostTokenHash,
+            status: "SCANNING",
+            expiresAt,
+          },
+          include: { items: true },
+        });
+        return { bill, shareToken, hostToken };
+      } catch (err) {
+        if (!isShareTokenCollision(err)) throw err;
+        lastError = err;
+      }
+    }
+  }
 
-  return { bill, shareToken, hostToken };
+  throw lastError ?? new Error("Failed to allocate a unique share token");
 }
 
 /** Read access: anyone with the share token can fetch the bill. */

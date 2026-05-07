@@ -1,13 +1,21 @@
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
 import { customAlphabet } from "nanoid";
 
-// Share tokens are 10 chars from a 62-char alphabet ≈ 59 bits of entropy.
-// Bills auto-expire on a short TTL, so guessing is infeasible.
+// Share tokens use a 62-char alphabet. Default length is 4 (≈ 14.7M values),
+// which is enough for typical concurrent bill TTLs. On collision, callers bump
+// the length and retry.
 const URL_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const makeShareToken = customAlphabet(URL_ALPHABET, 10);
+const makeShareToken = customAlphabet(URL_ALPHABET, 4);
 
-/** Public-ish token used as the bill share URL slug. 10 chars, unguessable for the bill's TTL. */
-export const generateShareToken = () => makeShareToken();
+export const SHARE_TOKEN_MIN_LENGTH = 4;
+export const SHARE_TOKEN_MAX_LENGTH = 16;
+
+/**
+ * Public-ish token used as the bill share URL slug.
+ * Default length 4. If the caller hits a collision, retry with length+1, etc.
+ */
+export const generateShareToken = (length: number = SHARE_TOKEN_MIN_LENGTH): string =>
+  makeShareToken(Math.max(SHARE_TOKEN_MIN_LENGTH, Math.min(SHARE_TOKEN_MAX_LENGTH, length)));
 
 /** High-entropy capability token (e.g. host token). Hex-encoded; 48 chars. */
 export const generateCapabilityToken = () => randomBytes(24).toString("hex");
